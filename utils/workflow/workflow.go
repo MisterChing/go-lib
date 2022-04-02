@@ -8,7 +8,8 @@ import (
 	"time"
 )
 
-func GoWithNumber(wg sync.WaitGroup, goroutineNum int, fn func()) {
+// GoWithNumber wg不能复制 可以用vet 检测 go vet -copylocks ./xxx.go
+func GoWithNumber(wg *sync.WaitGroup, goroutineNum int, fn func()) {
 	wg.Add(goroutineNum)
 	for i := 0; i < goroutineNum; i++ {
 		go func() {

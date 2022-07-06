@@ -5,38 +5,44 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"sync/atomic"
 	"syscall"
 	"time"
 )
 
 type IntervalManagerBizFn interface {
-	BusinessFn(ctx context.Context, buf <-chan interface{}) error
-	OnShutDownFn(ctx context.Context, buf <-chan interface{}) error
+	BusinessFn(ctx context.Context, messages []interface{}) error
+	OnShutDownFn(ctx context.Context, messages []interface{}) error
 }
+
+//type IntervalManagerBizFn interface {
+//	BusinessFn(ctx context.Context, buf <-chan interface{}) error
+//	OnShutDownFn(ctx context.Context, buf <-chan interface{}) error
+//}
 
 type IntervalManager struct {
-	name         string
-	tickDu       time.Duration
-	buf          chan interface{}
-	bufSize      int
-	quitCh       chan os.Signal
-	workerQuitCh chan struct{}
-	bizFn        IntervalManagerBizFn
-	successQuit  chan struct{}
-	runningNum   int32
+	name           string
+	tickDu         time.Duration
+	buf            chan interface{}
+	bufSize        int
+	fetchBatchSize int
+	quitCh         chan os.Signal
+	workerQuitCh   chan struct{}
+	bizFn          IntervalManagerBizFn
+	successQuit    chan struct{}
+	runningNum     int32
 }
 
-func NewIntervalManager(name string, qSize int, tickDu time.Duration) *IntervalManager {
+func NewIntervalManager(name string, qSize int, fetchBatchSize int, tickDu time.Duration) *IntervalManager {
 	obj := &IntervalManager{
-		name:         name,
-		quitCh:       make(chan os.Signal, 1),
-		buf:          make(chan interface{}, qSize),
-		bufSize:      qSize,
-		workerQuitCh: make(chan struct{}),
-		successQuit:  make(chan struct{}, 1),
-		tickDu:       tickDu,
+		name:           name,
+		quitCh:         make(chan os.Signal, 1),
+		buf:            make(chan interface{}, qSize),
+		bufSize:        qSize,
+		fetchBatchSize: fetchBatchSize,
+		workerQuitCh:   make(chan struct{}),
+		successQuit:    make(chan struct{}, 1),
+		tickDu:         tickDu,
 	}
 	return obj
 }
@@ -58,10 +64,11 @@ func (manager *IntervalManager) intervalWrap() {
 			limitQ <- struct{}{}
 			atomic.AddInt32(&manager.runningNum, 1)
 			ctx := genGinContext()
+			messages := FetchMessage(manager.buf, manager.fetchBatchSize)
 			go func() {
 				defer func() {
 					if err := recover(); err != nil {
-                        //todo log
+						//todo log
 					}
 				}()
 				defer func() {
@@ -69,7 +76,7 @@ func (manager *IntervalManager) intervalWrap() {
 					<-limitQ
 				}()
 				//启动定时消费
-				_ = manager.bizFn.BusinessFn(ctx, manager.buf)
+				_ = manager.bizFn.BusinessFn(ctx, messages)
 			}()
 		case <-manager.workerQuitCh:
 			goto END
@@ -86,7 +93,8 @@ func (manager *IntervalManager) Produce(ctx context.Context, data interface{}) {
 		manager.buf <- data
 	} else {
 		//立即消费
-		_ = manager.bizFn.BusinessFn(ctx, manager.buf)
+		messages := FetchMessage(manager.buf, manager.fetchBatchSize)
+		_ = manager.bizFn.BusinessFn(ctx, messages)
 		manager.buf <- data
 	}
 }
@@ -125,18 +133,19 @@ func (manager *IntervalManager) monitor() {
 	for len(manager.buf) > 0 {
 		limitQ <- struct{}{}
 		atomic.AddInt32(&manager.runningNum, 1)
+		messages := FetchMessage(manager.buf, manager.fetchBatchSize)
 		go func() {
 			ctx := genGinContext()
 			defer func() {
 				if err := recover(); err != nil {
-                    //todo log
+					//todo log
 				}
 			}()
 			defer func() {
 				atomic.AddInt32(&manager.runningNum, -1)
 				<-limitQ
 			}()
-			_ = manager.bizFn.OnShutDownFn(ctx, manager.buf)
+			_ = manager.bizFn.OnShutDownFn(ctx, messages)
 		}()
 	}
 	//等待全部running协程退出

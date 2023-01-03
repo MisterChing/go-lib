@@ -20,10 +20,10 @@ func GoWithNumber(wg *sync.WaitGroup, goroutineNum int, fn func()) {
 	wg.Wait()
 }
 
-func GoWithRecover(c *gin.Context, fn func()) {
+func GinGoWithRecover(c *gin.Context, fn func(c *gin.Context)) {
 	cp := c.Copy()
-	go func() {
-		defer func(c *gin.Context) {
+	go func(c *gin.Context) {
+		defer func() {
 			if err := recover(); err != nil {
 				if c != nil {
 					fmt.Println(string(debug.Stack()))
@@ -31,9 +31,9 @@ func GoWithRecover(c *gin.Context, fn func()) {
 					fmt.Println(string(debug.Stack()))
 				}
 			}
-		}(cp)
-		fn()
-	}()
+		}()
+		fn(c)
+	}(cp)
 }
 
 //func GoWithRecover(fn func()) {
@@ -47,12 +47,12 @@ func GoWithRecover(c *gin.Context, fn func()) {
 //	}()
 //}
 
-type FuncWithArgs func(args ...interface{})
+type FuncWithArgs func(c *gin.Context, args ...interface{})
 
-func GoWithRecoverWithArgs(c *gin.Context, fn FuncWithArgs, args ...interface{}) {
+func GinGoWithRecoverWithArgs(c *gin.Context, fn FuncWithArgs, args ...interface{}) {
 	cp := c.Copy()
-	go func() {
-		defer func(c *gin.Context) {
+	go func(c *gin.Context) {
+		defer func() {
 			if err := recover(); err != nil {
 				if c != nil {
 					fmt.Println(string(debug.Stack()))
@@ -60,12 +60,12 @@ func GoWithRecoverWithArgs(c *gin.Context, fn FuncWithArgs, args ...interface{})
 					fmt.Println(string(debug.Stack()))
 				}
 			}
-		}(cp)
-		fn(args...)
-	}()
+		}()
+		fn(cp, args...)
+	}(cp)
 }
 
-func GoGroupWait(c *gin.Context, fnArr ...func() string) {
+func GinGoGroupWait(c *gin.Context, fnArr ...func(c *gin.Context) string) {
 	if len(fnArr) == 0 {
 		return
 	}
@@ -74,8 +74,9 @@ func GoGroupWait(c *gin.Context, fnArr ...func() string) {
 	wg.Add(goNum)
 	for _, fn := range fnArr {
 		cp := c.Copy()
-		go func(doFn func() string) {
-			defer func(c *gin.Context) {
+		doFn := fn
+		go func(c *gin.Context) {
+			defer func() {
 				if err := recover(); err != nil {
 					if c != nil {
 						fmt.Println(string(debug.Stack()))
@@ -83,10 +84,10 @@ func GoGroupWait(c *gin.Context, fnArr ...func() string) {
 						fmt.Println(string(debug.Stack()))
 					}
 				}
-			}(cp)
+			}()
 			defer wg.Done()
-			doFn()
-		}(fn)
+			doFn(c)
+		}(cp)
 	}
 	wg.Wait()
 }

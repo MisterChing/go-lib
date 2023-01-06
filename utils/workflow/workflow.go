@@ -61,7 +61,7 @@ func GinGoWithRecoverWithArgs(c *gin.Context, fn FuncWithArgs, args ...interface
 				}
 			}
 		}()
-		fn(cp, args...)
+		fn(c, args...)
 	}(cp)
 }
 

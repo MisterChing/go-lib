@@ -39,7 +39,7 @@ func KraGoWithRecover(ctx context.Context, logger klog.Logger, fn func(ctx conte
 				}
 			}
 		}()
-		fn(ctxCp)
+		fn(ctx)
 	}(ctxCp)
 }
 

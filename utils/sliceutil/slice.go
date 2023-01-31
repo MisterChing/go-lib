@@ -1,5 +1,7 @@
 package sliceutil
 
+import "math"
+
 func InSlice[E comparable](needle E, haystack []E) bool {
 	for _, v := range haystack {
 		if needle == v {
@@ -48,4 +50,29 @@ func SplitSliceToGroup[E any](arr []E, size int64) [][]E {
 		start = i * size
 	}
 	return segments
+}
+
+func SlicePage(page, pageSize, total int) (sliceStart, sliceEnd int) {
+	if page < 0 {
+		page = 1
+	}
+	if pageSize < 0 {
+		pageSize = 20
+	}
+	if pageSize > total {
+		return 0, total
+	}
+
+	// 总页数
+	pageCount := int(math.Ceil(float64(total) / float64(pageSize)))
+	if page > pageCount {
+		return 0, 0
+	}
+	sliceStart = (page - 1) * pageSize
+	sliceEnd = sliceStart + pageSize
+
+	if sliceEnd > total {
+		sliceEnd = total
+	}
+	return sliceStart, sliceEnd
 }

@@ -55,7 +55,7 @@ func KraGoWithRecoverWithoutCancel(ctx context.Context, logger klog.Logger, fn f
 				if ctx != nil {
 					if logH != nil {
 						logH.WithContext(ctx).Errorw(
-							"x_msg", "GoWithRecover panic recovered",
+							"x_msg", "KraGoWithRecoverWithoutCancel panic recovered",
 							"panic_err", err,
 							"stack", string(debug.Stack()),
 						)
@@ -63,7 +63,7 @@ func KraGoWithRecoverWithoutCancel(ctx context.Context, logger klog.Logger, fn f
 				} else {
 					if logH != nil {
 						logH.Errorw(
-							"x_msg", "GoWithRecover panic recovered",
+							"x_msg", "KraGoWithRecoverWithoutCancel panic recovered",
 							"panic_err", err,
 							"stack", string(debug.Stack()),
 						)

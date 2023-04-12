@@ -20,12 +20,24 @@ func TransferToContext(c *gin.Context) context.Context {
 }
 
 func CopyContext(oldCtx context.Context) context.Context {
-	var newCtx context.Context
-	if ginCtx, ok := kgin.FromGinContext(oldCtx); ok {
-		newCtx = kgin.NewGinContext(oldCtx, ginCtx.Copy())
+	var (
+		newCtx  context.Context
+		lastCtx = oldCtx
+	)
+	//0x1 transport context
+	if tr, ok := transport.FromServerContext(oldCtx); ok {
+		newCtx = transport.NewServerContext(lastCtx, tr)
+		lastCtx = newCtx
 	}
+	//0x2 metadata
 	if md, ok := metadata.FromServerContext(oldCtx); ok {
-		newCtx = metadata.NewServerContext(oldCtx, md.Clone())
+		newCtx = metadata.NewServerContext(lastCtx, md.Clone())
+		lastCtx = newCtx
+	}
+	//0x3 gin
+	if ginCtx, ok := kgin.FromGinContext(oldCtx); ok {
+		newCtx = kgin.NewGinContext(lastCtx, ginCtx.Copy())
+		lastCtx = newCtx
 	}
 	if newCtx == nil {
 		return oldCtx
@@ -35,18 +47,24 @@ func CopyContext(oldCtx context.Context) context.Context {
 
 // CopyContextWithoutCancel 复制kratos context 并且移除cancel
 func CopyContextWithoutCancel(oldCtx context.Context) context.Context {
-	newCtx := context.Background() //需要重新创建个ctx来避免原ctx cancel
+	var (
+		newCtx  = context.Background() //需要重新创建个ctx来避免原ctx cancel
+		lastCtx = oldCtx
+	)
 	//0x1 transport context
 	if tr, ok := transport.FromServerContext(oldCtx); ok {
-		newCtx = transport.NewServerContext(newCtx, tr)
+		newCtx = transport.NewServerContext(lastCtx, tr)
+		lastCtx = newCtx
 	}
 	//0x2 metadata
 	if md, ok := metadata.FromServerContext(oldCtx); ok {
-		newCtx = metadata.NewServerContext(newCtx, md.Clone())
+		newCtx = metadata.NewServerContext(lastCtx, md.Clone())
+		lastCtx = newCtx
 	}
 	//0x3 gin
 	if ginCtx, ok := kgin.FromGinContext(oldCtx); ok {
-		newCtx = kgin.NewGinContext(newCtx, ginCtx.Copy())
+		newCtx = kgin.NewGinContext(lastCtx, ginCtx.Copy())
+		lastCtx = newCtx
 	}
 	return newCtx
 }

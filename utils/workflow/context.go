@@ -27,6 +27,9 @@ func CopyContext(oldCtx context.Context) context.Context {
 	if md, ok := metadata.FromServerContext(oldCtx); ok {
 		newCtx = metadata.NewServerContext(oldCtx, md.Clone())
 	}
+	if newCtx == nil {
+		return oldCtx
+	}
 	return newCtx
 }
 

@@ -49,7 +49,7 @@ func CopyContext(oldCtx context.Context) context.Context {
 func CopyContextWithoutCancel(oldCtx context.Context) context.Context {
 	var (
 		newCtx  = context.Background() //需要重新创建个ctx来避免原ctx cancel
-		lastCtx = oldCtx
+		lastCtx = newCtx
 	)
 	//0x1 transport context
 	if tr, ok := transport.FromServerContext(oldCtx); ok {

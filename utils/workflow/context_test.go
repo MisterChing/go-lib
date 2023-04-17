@@ -27,8 +27,8 @@ func TestCopyContext(t *testing.T) {
 	ctxCp := CopyContext(ctx)
 	ctxCpWithNoCancel := CopyContextWithoutCancel(ctx)
 	md1, _ := metadata.FromServerContext(ctx)
-
 	md2, _ := metadata.FromServerContext(ctxCp)
-	debugutil.DebugPrintV2("after", ctx, ctxCp, ctxCpWithNoCancel, ctx2, md1, md2)
+	md3, _ := metadata.FromServerContext(ctxCpWithNoCancel)
+	debugutil.DebugPrintV2("after", ctx, ctxCp, ctxCpWithNoCancel, ctx2, md1, md2, md3)
 
 }

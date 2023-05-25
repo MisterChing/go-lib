@@ -2,7 +2,6 @@ package confguard
 
 import (
 	kencoding "github.com/go-kratos/kratos/v2/encoding"
-	"log"
 	"reflect"
 	"sync"
 )
@@ -26,18 +25,18 @@ func (gdr *Guarder) Get() interface{} {
 }
 
 func (gdr *Guarder) Lock() {
-	log.Println("lock")
 	gdr.rw.Lock()
 }
 
 func (gdr *Guarder) Unlock() {
-	log.Println("unlock")
 	gdr.rw.Unlock()
 }
 
 //populateWhenPtr  只适用于child实际类型是ptr类型
 func (gdr *Guarder) populateWhenPtr(input []byte) error {
 	rv := reflect.ValueOf(gdr)
+	rv.MethodByName("Lock").Call(nil)         //lock
+	defer rv.MethodByName("Unlock").Call(nil) //unlock
 
 	//childField := rv.Elem().FieldByName("child")
 	//childFieldContent := childField.Elem()
@@ -85,7 +84,6 @@ func (gdr *Guarder) populateWhenPtr(input []byte) error {
 	//	//unsafe.Pointer(childContentUnderlyingCopyPtr.UnsafeAddr()),
 	//)
 
-	rv.MethodByName("Lock").Call(nil) //lock
 	//rv.Elem().FieldByName("child").Set(addressableChildCopy.Elem()) //可导出字段可用，非导出字段panic
 	//获取非导出字段并转换为可寻址的ptr
 	childField2 := rv.Elem().FieldByName("child")
@@ -103,6 +101,5 @@ func (gdr *Guarder) populateWhenPtr(input []byte) error {
 	//	//unsafe.Pointer(childAddressablePtr.UnsafeAddr()),
 	//)
 	childAddressablePtr.Elem().Set(childContentUnderlyingCopyPtr.Elem())
-	rv.MethodByName("Unlock").Call(nil) //unlock
 	return nil
 }

@@ -100,6 +100,11 @@ func (g *Guard) Close() {
 
 func (g *Guard) populate(input []byte) error {
 	rv := reflect.ValueOf(g.opts.guarder)
+	//g.opts.guarder.lock()
+	//defer g.opts.guarder.unlock()
+	rv.MethodByName("Lock").Call(nil)         //lock
+	defer rv.MethodByName("Unlock").Call(nil) //unlock
+
 	//根据child类型创建一个copy的ptr
 	addressableChildCopy := reflect.New(rv.Elem().FieldByName("child").Elem().Type())
 
@@ -107,13 +112,12 @@ func (g *Guard) populate(input []byte) error {
 		return err
 	}
 
-	rv.MethodByName("Lock").Call(nil) //lock
 	//rv.Elem().FieldByName("child").Set(addressableChildCopy.Elem()) //可导出字段可用，非导出字段panic
 	//获取非导出字段并转换为可寻址的ptr
 	childAddressable := rv.Elem().FieldByName("child")
 	childAddressablePtr := reflect.NewAt(childAddressable.Type(), unsafe.Pointer(childAddressable.UnsafeAddr()))
 	childAddressablePtr.Elem().Set(addressableChildCopy.Elem())
-	rv.MethodByName("Unlock").Call(nil) //unlock
+
 	return nil
 }
 

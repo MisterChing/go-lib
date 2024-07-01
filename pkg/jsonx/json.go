@@ -9,19 +9,21 @@ func init() {
 	// RegisterFuzzyDecoders decode input from PHP with tolerance.
 	//  It will handle string/number auto conversation, and treat empty [] as empty struct.
 	extra.RegisterFuzzyDecoders()
+	////自定义扩展
+	//extra2.RegisterCustomFuzzyDecoders()
 }
 
-var json = jsoniter.ConfigCompatibleWithStandardLibrary
+var newJson = jsoniter.ConfigCompatibleWithStandardLibrary
 
-func Marshal(obj interface{}) ([]byte, error) {
-	return json.Marshal(obj)
+func Marshal(v interface{}) ([]byte, error) {
+	return newJson.Marshal(v)
 }
-func MarshalToString(obj interface{}) (string, error) {
-	return json.MarshalToString(obj)
+func MarshalToString(v interface{}) (string, error) {
+	return newJson.MarshalToString(v)
 }
 func Unmarshal(data []byte, v interface{}) error {
-	return json.Unmarshal(data, &v)
+	return newJson.Unmarshal(data, &v)
 }
 func UnmarshalFromString(data string, v interface{}) error {
-	return json.UnmarshalFromString(data, &v)
+	return newJson.UnmarshalFromString(data, &v)
 }

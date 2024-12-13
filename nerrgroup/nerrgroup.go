@@ -41,7 +41,7 @@ func (ng *Group) wrapWithRecover(fn func() error) func() error {
 					ng.opts.panicFn(r)
 					return
 				}
-				log.Println("panic occurred ", string(debug.Stack()))
+				log.Println(PanicRecoveredError.Error(), string(debug.Stack()))
 			}
 		}()
 		if err := fn(); err != nil {

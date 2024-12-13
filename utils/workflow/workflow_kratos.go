@@ -2,9 +2,11 @@ package workflow
 
 import (
 	"context"
-	klog "github.com/go-kratos/kratos/v2/log"
 	"runtime/debug"
 	"sync"
+
+	"github.com/MisterChing/go-lib/utils/contextutil"
+	klog "github.com/go-kratos/kratos/v2/log"
 )
 
 func KraGoWithRecover(ctx context.Context, logger klog.Logger, fn func(ctx context.Context)) {
@@ -14,7 +16,7 @@ func KraGoWithRecover(ctx context.Context, logger klog.Logger, fn func(ctx conte
 	if logger != nil {
 		logH = klog.NewHelper(klog.With(logger, "x_module", "utils/GoWithRecover"))
 	}
-	ctxCp := CopyContext(ctx)
+	ctxCp := contextutil.CopyContext(ctx)
 	go func(ctx context.Context) {
 		defer func() {
 			if err := recover(); err != nil {
@@ -48,7 +50,7 @@ func KraGoWithRecoverWithoutCancel(ctx context.Context, logger klog.Logger, fn f
 	if logger != nil {
 		logH = klog.NewHelper(klog.With(logger, "x_module", "utils/KraGoWithRecoverWithoutCancel"))
 	}
-	ctxCp := CopyContextWithoutCancel(ctx)
+	ctxCp := contextutil.CopyContextWithoutCancel(ctx)
 	go func(ctx context.Context) {
 		defer func() {
 			if err := recover(); err != nil {
@@ -89,7 +91,7 @@ func KraGoGroupWait(ctx context.Context, logger klog.Logger, fnArr ...func(ctx c
 	goNum := len(fnArr)
 	wg.Add(goNum)
 	for _, fn := range fnArr {
-		ctxCp := CopyContext(ctx)
+		ctxCp := contextutil.CopyContext(ctx)
 		doFn := fn
 		go func(ctx context.Context) {
 			defer func() {

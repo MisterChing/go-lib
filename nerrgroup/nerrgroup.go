@@ -1,4 +1,4 @@
-package errgroup
+package nerrgroup
 
 import (
 	"context"

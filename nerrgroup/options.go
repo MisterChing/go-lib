@@ -1,14 +1,14 @@
-package errgroup
+package nerrgroup
 
 import (
-	syserrgroup "golang.org/x/sync/errgroup"
+	"golang.org/x/sync/errgroup"
 )
 
 type Option func(*options)
 
 type options struct {
 	panicFn func(pac any)
-	ieg     *syserrgroup.Group
+	ieg     *errgroup.Group
 }
 
 func WithPanicFn(fn func(pac any)) Option {
@@ -17,7 +17,7 @@ func WithPanicFn(fn func(pac any)) Option {
 	}
 }
 
-func WithRawGroup(eg *syserrgroup.Group) Option {
+func WithRawGroup(eg *errgroup.Group) Option {
 	return func(o *options) {
 		o.ieg = eg
 	}

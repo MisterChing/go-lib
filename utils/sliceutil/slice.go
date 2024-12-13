@@ -23,6 +23,14 @@ func SliceUnique[E comparable](arr []E) []E {
 	return result
 }
 
+func ChunkSlice[E comparable](arr []E, size int) [][]E {
+	var chunks [][]E
+	for size < len(arr) {
+		arr, chunks = arr[size:], append(chunks, arr[0:size:size])
+	}
+	return append(chunks, arr)
+}
+
 func SplitSliceToGroup[E any](arr []E, size int64) [][]E {
 	max := int64(len(arr))
 	//判断数组大小是否小于等于指定分割大小的值，是则把原数组放入二维数组返回

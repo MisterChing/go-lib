@@ -10,7 +10,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var PanicRecoveredError = errors.New("panic recovered")
+var PanicRecoveredError = errors.New("nerrgroup panic recovered")
 
 type Group struct {
 	opts options

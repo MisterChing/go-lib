@@ -67,10 +67,6 @@ func SlicePage(page, pageSize, total int) (sliceStart, sliceEnd int) {
 	if pageSize < 0 {
 		pageSize = 20
 	}
-	if pageSize > total {
-		return 0, total
-	}
-
 	// 总页数
 	pageCount := int(math.Ceil(float64(total) / float64(pageSize)))
 	if page > pageCount {

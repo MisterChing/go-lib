@@ -23,6 +23,21 @@ func SliceUnique[E comparable](arr []E) []E {
 	return result
 }
 
+func RemoveSliceElem[E comparable](haystack []E, toRemove []E) []E {
+	tmpSet := map[E]struct{}{}
+	for _, item := range toRemove {
+		tmpSet[item] = struct{}{}
+	}
+	newRet := make([]E, 0, len(haystack))
+	for _, v := range haystack {
+		if _, ok := tmpSet[v]; !ok {
+			newRet = append(newRet, v)
+			continue
+		}
+	}
+	return newRet
+}
+
 func ChunkSlice[E comparable](arr []E, size int) [][]E {
 	var chunks [][]E
 	for size < len(arr) {

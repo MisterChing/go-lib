@@ -4,7 +4,7 @@ package netx
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -55,13 +55,15 @@ func GetCurlCommand(req *http.Request) (*CurlCommand, error) {
 
 	if req.Body != nil {
 		var buff bytes.Buffer
-		_, err := buff.ReadFrom(req.Body)
+		reqBody, _ := req.GetBody()
+		_, err := buff.ReadFrom(reqBody)
 		if err != nil {
 			return nil, fmt.Errorf("getCurlCommand: buffer read from body error: %w", err)
 		}
+
 		// reset body for potential re-reads
-		req.Body = ioutil.NopCloser(bytes.NewBuffer(buff.Bytes()))
-		if len(buff.String()) > 0 {
+		req.Body = io.NopCloser(bytes.NewBuffer(buff.Bytes()))
+		if buff.Len() > 0 {
 			bodyEscaped := bashEscape(buff.String())
 			command.append("-d", bodyEscaped)
 		}

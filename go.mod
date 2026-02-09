@@ -1,6 +1,6 @@
 module github.com/MisterChing/go-lib
 
-go 1.18
+go 1.24
 
 require (
 	github.com/dustin/go-humanize v1.0.1
@@ -11,9 +11,14 @@ require (
 	github.com/go-kratos/kratos/v2 v2.5.3
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/json-iterator/go v1.1.9
+	github.com/miekg/dns v1.1.72
 	github.com/nacos-group/nacos-sdk-go v1.1.3
+	github.com/redis/go-redis/v9 v9.0.4
 	github.com/speps/go-hashids/v2 v2.0.1
 	github.com/spf13/cast v1.5.0
+	golang.org/x/sync v0.19.0
+	gorm.io/driver/mysql v1.5.1
+	gorm.io/gorm v1.25.1
 )
 
 require (
@@ -39,14 +44,15 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v0.0.0-20180701023420-4b7aa43c6742 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/redis/go-redis/v9 v9.0.4 // indirect
 	github.com/ugorji/go/codec v1.1.7 // indirect
 	go.uber.org/atomic v1.6.0 // indirect
 	go.uber.org/multierr v1.5.0 // indirect
 	go.uber.org/zap v1.15.0 // indirect
-	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9 // indirect
-	golang.org/x/sync v0.0.0-20220513210516-0976fa681c29 // indirect
-	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad // indirect
+	golang.org/x/crypto v0.46.0 // indirect
+	golang.org/x/mod v0.31.0 // indirect
+	golang.org/x/net v0.48.0 // indirect
+	golang.org/x/sys v0.39.0 // indirect
+	golang.org/x/tools v0.40.0 // indirect
 	google.golang.org/genproto v0.0.0-20220519153652-3a47de7e79bd // indirect
 	google.golang.org/grpc v1.46.2 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
@@ -54,6 +60,4 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gorm.io/driver/mysql v1.5.1 // indirect
-	gorm.io/gorm v1.25.1 // indirect
 )

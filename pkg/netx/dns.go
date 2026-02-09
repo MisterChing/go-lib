@@ -152,13 +152,14 @@ func searchIpByLocalHostsWithPath(domain, hostsPath string) (string, error) {
 		return "", errors.New("domain is empty")
 	}
 
-	file, err := readFile(hostsPath)
+	fileContent, err := os.ReadFile(hostsPath)
 	if err != nil {
 		return "", fmt.Errorf("read hosts file failed: %w", err)
 	}
 
 	// 逐行解析
-	lines := splitLines(file)
+	lines := splitLines(string(fileContent))
+
 	for _, line := range lines {
 		// 跳过注释和空行
 		if line == "" || line[0] == '#' {
@@ -191,17 +192,12 @@ func getHostsFilePath() string {
 	return "/etc/hosts"
 }
 
-// readFile 读取文件内容
-func readFile(path string) (string, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
-}
-
-// splitLines 分割字符串为行
+// splitLines 分割字符串为行（支持 \n, \r\n, \r 三种换行符）
 func splitLines(s string) []string {
+	// 统一换行符：将 \r\n 和 \r 都替换为 \n
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\r", "\n")
+
 	lines := strings.Split(s, "\n")
 	result := make([]string, 0, len(lines))
 	for _, line := range lines {

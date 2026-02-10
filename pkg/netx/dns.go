@@ -11,133 +11,267 @@ import (
 	dnsv1 "github.com/miekg/dns"
 )
 
-// DNSConfig DNS 配置
-type DNSConfig struct {
-	Name    string        // DNS 配置名称，用于标识不同的 DNS 配置（如 "Google", "Aliyun"）
-	Servers []string      // DNS 服务器列表，如 ["8.8.8.8:53", "114.114.114.114:53"]
-	Timeout time.Duration // 超时时间
+// AdvancedDNSConfig 高级 DNS 配置（类似 /etc/resolv.conf）
+type AdvancedDNSConfig struct {
+	Name        string        // 配置名称，用于标识不同的配置（如 "Production", "Test"）
+	Nameservers []string      // DNS 服务器列表，如 ["10.189.0.10:53"]
+	Search      []string      // 域名搜索后缀列表，如 ["svc.cluster.local", "cluster.local"]
+	Timeout     time.Duration // 单次查询超时时间（对应 resolv.conf 的 timeout）
+	Attempts    int           // 查询失败后的重试次数（对应 resolv.conf 的 attempts）
+	Ndots       int           // 域名中点的数量阈值（对应 resolv.conf 的 ndots）
 }
 
-// DefaultDNSConfig 默认配置（使用常见的公共 DNS）
-var DefaultDNSConfig = &DNSConfig{
-	Name: "Default",
-	Servers: []string{
-		"8.8.8.8:53",         // Google DNS
-		"114.114.114.114:53", // 114 DNS
-		"223.5.5.5:53",       // 阿里 DNS
-	},
-	Timeout: 5 * time.Second,
-}
-
-// DNSQueryResult DNS 查询结果
-// 支持多种查询方式：DNS 服务器查询、本地 hosts 文件解析等
-type DNSQueryResult struct {
-	ConfigName string // DNS 配置名称（如 "Default", "Google", "Local Hosts"）
-	Server     string // 实际使用的 DNS 服务器（如 "8.8.8.8:53", "file:///etc/hosts"）
+// AdvancedDNSQueryResult 高级 DNS 查询的详细结果
+type AdvancedDNSQueryResult struct {
+	ConfigName string // 配置名称（如 "Production", "Test"）
+	Query      string // 查询的完整域名（如 "redis.svc.cluster.local"）
+	Nameserver string // 使用的 DNS 服务器（如 "10.189.0.10:53"）
 	Error      string // 错误信息（如果有）
 	IP         string // 解析得到的 IP
 }
 
-// SearchIpByDomainWithMultipleDNS 使用多个 DNS 配置查询同一个域名，返回所有结果（用于对比不同 DNS 的解析结果）
-// 默认配置始终会被追加到第一个位置
-func SearchIpByDomainWithMultipleDNS(domain string, configs []*DNSConfig) []*DNSQueryResult {
-	// 始终将默认配置放在第一个位置
-	allConfigs := make([]*DNSConfig, 0, len(configs)+1)
-	allConfigs = append(allConfigs, DefaultDNSConfig)
+// DefaultAdvancedDNSConfig 默认高级配置
+var DefaultAdvancedDNSConfig = &AdvancedDNSConfig{
+	Name:        "Default",
+	Nameservers: []string{"8.8.8.8:53"},
+	Search:      []string{},
+	Timeout:     1 * time.Second,
+	Attempts:    2,
+	Ndots:       2,
+}
 
-	if len(configs) > 0 {
-		allConfigs = append(allConfigs, configs...)
+// SearchIpByDomainWithMultipleAdvancedConfigs 使用多个高级配置并发查询同一个域名，返回所有配置的查询结果
+// 用于对比不同配置（如不同环境、不同 DNS 服务器）的解析结果
+// 默认配置（DefaultAdvancedDNSConfig）会自动追加到第一个位置
+// 优化：所有配置并发查询，带总超时控制
+func SearchIpByDomainWithMultipleAdvancedConfigs(domain string, configs []*AdvancedDNSConfig) ([]*AdvancedDNSQueryResult, error) {
+	if domain == "" {
+		return nil, fmt.Errorf("domain is empty")
 	}
 
-	// 预分配结果数组，保持与 allConfigs 相同的顺序
-	results := make([]*DNSQueryResult, len(allConfigs))
+	// 始终将默认配置放在第一个位置
+	allConfigs := make([]*AdvancedDNSConfig, 0, len(configs)+1)
+	allConfigs = append(allConfigs, DefaultAdvancedDNSConfig)
+
+	// 追加用户自定义的配置（去重：如果用户配置中已有同名配置，跳过）
+	if len(configs) > 0 {
+		for _, cfg := range configs {
+			// 检查是否与默认配置同名（避免重复）
+			if cfg != nil && cfg.Name != DefaultAdvancedDNSConfig.Name {
+				allConfigs = append(allConfigs, cfg)
+			}
+		}
+	}
 
 	// 使用带索引的 channel 来保持顺序
 	type indexedResult struct {
 		index  int
-		result *DNSQueryResult
+		result *AdvancedDNSQueryResult
+		err    error
 	}
 	resultCh := make(chan indexedResult, len(allConfigs))
 
-	// 并发查询所有 DNS 配置（传递索引以保持顺序）
-	for i, config := range allConfigs {
-		go func(idx int, cfg *DNSConfig) {
-			result := &DNSQueryResult{
-				ConfigName: cfg.Name,
+	// 并发查询所有配置（传递索引以保持顺序）
+	for i, cfg := range allConfigs {
+		go func(idx int, config *AdvancedDNSConfig) {
+			result, err := SearchIpByDomainAdvancedWithDetails(domain, config)
+			resultCh <- indexedResult{
+				index:  idx,
+				result: result,
+				err:    err,
 			}
-
-			ip, err := searchWithSingleDNSConfig(domain, cfg)
-			result.IP = ip
-			if err != nil {
-				result.Error = err.Error()
-			}
-
-			// 记录实际使用的服务器（第一个成功的）
-			if err == nil && len(cfg.Servers) > 0 {
-				result.Server = cfg.Servers[0]
-			}
-
-			// 发送结果时带上索引
-			resultCh <- indexedResult{index: idx, result: result}
-		}(i, config)
+		}(i, cfg)
 	}
 
 	// 收集所有结果并放到对应的索引位置（保持与 allConfigs 相同的顺序）
-	for i := 0; i < len(allConfigs); i++ {
+	orderedResults := make([]*AdvancedDNSQueryResult, len(allConfigs))
+
+	for range allConfigs {
 		ir := <-resultCh
-		results[ir.index] = ir.result
+		orderedResults[ir.index] = ir.result
 	}
 
-	return results
+	return orderedResults, nil
 }
 
-// searchWithSingleDNSConfig 使用单个 DNS 配置查询（内部辅助函数）
-func searchWithSingleDNSConfig(domain string, config *DNSConfig) (string, error) {
+// SearchIpByDomainAdvancedWithDetails 使用高级配置查询域名，返回最终命中的查询结果
+// 成功时返回命中的查询结果；失败时返回最后一次查询的失败结果
+// 优化：使用并发查询，一旦任何查询成功立即返回，最坏情况超时 = max(timeout * attempts)
+func SearchIpByDomainAdvancedWithDetails(domain string, config *AdvancedDNSConfig) (*AdvancedDNSQueryResult, error) {
+	if domain == "" {
+		return nil, fmt.Errorf("domain is empty")
+	}
+
+	// 使用默认配置（如果为 nil）
 	if config == nil {
-		config = DefaultDNSConfig
+		config = DefaultAdvancedDNSConfig
 	}
 
-	// 确保域名以 . 结尾
-	if domain[len(domain)-1] != '.' {
-		domain = domain + "."
+	// 确保必要的配置有默认值
+	if len(config.Nameservers) == 0 {
+		return nil, fmt.Errorf("no nameservers configured")
+	}
+	if config.Timeout <= 0 {
+		config.Timeout = 1 * time.Second
+	}
+	if config.Attempts <= 0 {
+		config.Attempts = 2
+	}
+	if config.Ndots <= 0 {
+		config.Ndots = 2
+	}
+	// 如果 Name 为空，设置一个默认名称
+	if config.Name == "" {
+		config.Name = "Unnamed"
 	}
 
+	// 1. 根据 ndots 决定查询顺序
+	queries := buildQueryList(domain, config.Search, config.Ndots)
+
+	// 2. 创建 DNS 客户端
 	client := &dnsv1.Client{
 		Timeout: config.Timeout,
 	}
 
+	// 3. 为每个查询域名生成一个任务
+	resultCh := make(chan *AdvancedDNSQueryResult, len(queries))
+
+	// 并发执行所有查询
+	for _, query := range queries {
+		go func(q string) {
+			// 确保域名以 . 结尾（FQDN）
+			queryFQDN := q
+			if queryFQDN[len(queryFQDN)-1] != '.' {
+				queryFQDN = queryFQDN + "."
+			}
+
+			var lastResult *AdvancedDNSQueryResult
+
+			// 依次尝试每个 nameserver（失败才用下一个）
+			for _, nameserver := range config.Nameservers {
+				// 对当前 nameserver 尝试 attempts 次（失败才重试）
+				for attempt := 1; attempt <= config.Attempts; attempt++ {
+					ip, err := queryDNS(client, queryFQDN, nameserver)
+
+					result := &AdvancedDNSQueryResult{
+						ConfigName: config.Name,
+						Query:      q,
+						Nameserver: nameserver,
+						IP:         ip,
+					}
+
+					if err != nil {
+						result.Error = err.Error()
+					}
+
+					lastResult = result
+
+					// 如果成功，立即返回
+					if ip != "" && err == nil {
+						resultCh <- result
+						return
+					}
+				}
+			}
+
+			// 所有 nameserver 都失败，发送最后的失败结果
+			if lastResult != nil {
+				resultCh <- lastResult
+			}
+		}(query)
+	}
+
+	// 收集结果：找到第一个成功的就返回
+	var allResults []*AdvancedDNSQueryResult
+
+	for i := 0; i < len(queries); i++ {
+		result := <-resultCh
+		allResults = append(allResults, result)
+
+		// 如果成功，立即返回
+		if result.IP != "" && result.Error == "" {
+			return result, nil
+		}
+	}
+
+	// 所有查询都失败了，返回最后一次查询的结果
+	if len(allResults) > 0 {
+		lastResult := allResults[len(allResults)-1]
+		return lastResult, fmt.Errorf("all queries failed, last error: %s", lastResult.Error)
+	}
+
+	return nil, fmt.Errorf("no queries executed for domain %s", domain)
+}
+
+// buildQueryList 根据 ndots 规则构建查询列表
+// 规则：
+//   - 如果域名中的 '.' 数量 >= ndots：先查询原始域名，再尝试追加 search 后缀
+//   - 如果域名中的 '.' 数量 < ndots：先尝试追加 search 后缀，再查询原始域名
+//   - 如果 searchDomains 为空或 nil：直接返回原始域名（无论 ndots 为多少）
+func buildQueryList(domain string, searchDomains []string, ndots int) []string {
+	// 去除尾部的 '.'（如果有）
+	domain = strings.TrimSuffix(domain, ".")
+
+	// 如果 search 为空，直接返回原始域名
+	if len(searchDomains) == 0 {
+		return []string{domain}
+	}
+
+	// 计算域名中 '.' 的数量
+	dotCount := strings.Count(domain, ".")
+
+	var queries []string
+
+	if dotCount >= ndots {
+		// 先查询原始域名
+		queries = append(queries, domain)
+		// 再尝试追加 search 后缀
+		for _, suffix := range searchDomains {
+			if suffix != "" { // 跳过空后缀
+				queries = append(queries, domain+"."+suffix)
+			}
+		}
+	} else {
+		// 先尝试追加 search 后缀
+		for _, suffix := range searchDomains {
+			if suffix != "" { // 跳过空后缀
+				queries = append(queries, domain+"."+suffix)
+			}
+		}
+		// 最后查询原始域名
+		queries = append(queries, domain)
+	}
+
+	return queries
+}
+
+// queryDNS 执行单次 DNS 查询
+func queryDNS(client *dnsv1.Client, domain string, nameserver string) (string, error) {
 	msg := &dnsv1.Msg{}
 	msg.SetQuestion(domain, dnsv1.TypeA)
 	msg.RecursionDesired = true
 
-	// 尝试所有配置的 DNS 服务器
-	var lastErr error
-	for _, server := range config.Servers {
-		resp, _, err := client.Exchange(msg, server)
-		if err != nil {
-			lastErr = fmt.Errorf("query %s failed: %w", server, err)
-			continue
-		}
-
-		if resp == nil || resp.Rcode != dnsv1.RcodeSuccess {
-			lastErr = fmt.Errorf("query %s failed: invalid response", server)
-			continue
-		}
-
-		// 提取 A 记录
-		for _, answer := range resp.Answer {
-			if a, ok := answer.(*dnsv1.A); ok {
-				return a.A.String(), nil
-			}
-		}
-
-		lastErr = fmt.Errorf("no A record found in response from %s", server)
+	resp, _, err := client.Exchange(msg, nameserver)
+	if err != nil {
+		return "", fmt.Errorf("query %s failed: %w", nameserver, err)
 	}
 
-	if lastErr != nil {
-		return "", lastErr
+	if resp == nil || resp.Rcode != dnsv1.RcodeSuccess {
+		rcode := 0
+		if resp != nil {
+			rcode = resp.Rcode
+		}
+		return "", fmt.Errorf("query %s failed: invalid response (rcode=%d)", nameserver, rcode)
 	}
-	return "", errors.New("no ip found")
+
+	// 提取 A 记录
+	for _, answer := range resp.Answer {
+		if a, ok := answer.(*dnsv1.A); ok {
+			return a.A.String(), nil
+		}
+	}
+
+	return "", fmt.Errorf("no A record found from %s", nameserver)
 }
 
 // SearchIpByLocalHosts 从本地 hosts 文件解析域名
